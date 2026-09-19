@@ -3579,7 +3579,7 @@ async function openFile(btn, filePath) {
 async function openFolder(btn, filePath) {
   const folder = filePath.replace(/[\\\/][^\\\/]+$/, '');
   btn.textContent = '⏳ 打开中...';
-  const result = await window.api.winExec(`explorer.exe /select,"${filePath}"`);
+  const result = await window.api.showInFolder(filePath);
   if (result.success) {
     btn.textContent = '✓ 已打开';
   } else {

@@ -992,31 +992,69 @@ function migrateSystemPrompt(prompt) {
 }
 
 function getDefaultWhitelist() {
-  const home = process.env.USERPROFILE || 'C:\\Users\\Default';
-  return [
-    path.join(home, 'Desktop'),
-    path.join(home, 'Documents'),
-    path.join(home, 'Downloads'),
-    'D:\\',
-  ];
+  const isWin = process.platform === 'win32';
+  const isMac = process.platform === 'darwin';
+  const home = isWin
+    ? (process.env.USERPROFILE || 'C:\\Users\\Default')
+    : (process.env.HOME || '/root');
+
+  if (isWin) {
+    return [
+      path.join(home, 'Desktop'),
+      path.join(home, 'Documents'),
+      path.join(home, 'Downloads'),
+      'D:\\',
+    ];
+  } else if (isMac) {
+    return [
+      path.join(home, 'Desktop'),
+      path.join(home, 'Documents'),
+      path.join(home, 'Downloads'),
+      path.join(home, 'Desktop'),
+    ];
+  } else {
+    return [
+      path.join(home, 'Desktop'),
+      path.join(home, 'Documents'),
+      path.join(home, 'Downloads'),
+      home,
+    ];
+  }
 }
 
 function getDefaultSystemPrompt() {
-  return `你是一个由沈若萱开发的 AI 助手，后台连接着大模型 API。请用简洁、友好的方式回答问题。
-（你的名称与身份由当前所连接的 API 供应商决定。）
+  const isWin = process.platform === 'win32';
+  const isMac = process.platform === 'darwin';
+  const platformName = isWin ? 'Windows 11' : isMac ? 'macOS' : 'Linux';
+  const home = isWin ? '$env:USERPROFILE' : '~';
+  const desktopPath = isWin ? '$env:USERPROFILE\\Desktop' : '~/Desktop';
 
-你具备控制 Windows 11 系统的能力，包括执行系统命令和操作本地文件。
-
-## 一、系统命令执行
-当你需要执行系统命令时，使用以下格式输出（一行一个命令，不要包裹在代码块中）：
-!!!command:Get-Process | Select-Object -First 10!!!
-
-常用操作示例：
+  const cmdExamples = isWin ? `
 - 打开应用：!!!command:Start-Process notepad!!!
 - 查看系统信息：!!!command:systeminfo!!!
 - 查看IP地址：!!!command:ipconfig!!!
 - 查看磁盘空间：!!!command:Get-PSDrive -PSProvider FileSystem!!!
-- 列出桌面文件：!!!command:Get-ChildItem "$env:USERPROFILE\\Desktop"!!!
+- 列出桌面文件：!!!command:Get-ChildItem "$env:USERPROFILE\\Desktop"!!!` : isMac ? `
+- 打开应用：!!!command:open -a Safari!!!
+- 查看系统信息：!!!command:sw_vers!!!
+- 查看IP地址：!!!command:ifconfig!!!
+- 查看磁盘空间：!!!command:df -h!!!
+- 列出桌面文件：!!!command:ls -la ~/Desktop!!!` : `
+- 打开应用：!!!command:xdg-open https://www.baidu.com!!!
+- 查看系统信息：!!!command:uname -a!!!
+- 查看IP地址：!!!command:ip addr!!!
+- 查看磁盘空间：!!!command:df -h!!!
+- 列出桌面文件：!!!command:ls -la ~/Desktop!!!`;
+
+  return `你是一个由沈若萱开发的 AI 助手，后台连接着大模型 API。请用简洁、友好的方式回答问题。
+（你的名称与身份由当前所连接的 API 供应商决定。）
+
+你具备控制 ${platformName} 系统的能力，包括执行系统命令和操作本地文件。
+
+## 一、系统命令执行
+当你需要执行系统命令时，使用以下格式输出（一行一个命令，不要包裹在代码块中）：
+!!!command:ls -la!!!
+${cmdExamples}
 
 ## 二、本地文件操作（核心能力）⚠️ 强制规则
 
@@ -1035,7 +1073,7 @@ function getDefaultSystemPrompt() {
 当写入内容超过 1000 字，或写入代码文件（.js .py .html .css .ts .java .cpp 等）时，必须使用独立 content 通道，不要把 content 塞进 JSON 里。这样内容中的引号、换行、反斜杠都不需要转义，避免 JSON 解析失败。
 
 格式（!!!file: 指令只放 action 和 path，紧跟 !!!content-start!!! 和 !!!content-end!!! 包裹纯文本内容）：
-!!!file:{"action":"write","path":"D:\\\\app\\\\game.html"}!!!
+!!!file:{"action":"write","path":"~/Desktop/game.html"}!!!
 !!!content-start!!!
 <!DOCTYPE html>
 <html>
@@ -1056,22 +1094,6 @@ function getDefaultSystemPrompt() {
 3. 每块都使用独立 content 通道（!!!content-start!!! ... !!!content-end!!!）
 4. 系统会自动依次执行 write + 多次 append，全部完成后返回结果
 
-分块示例（写一篇 5000 字的长文）：
-第一轮输出：
-!!!file:{"action":"write","path":"D:\\\\notes\\\\长文.md"}!!!
-!!!content-start!!!
-# 标题
-第一段...（约1200字）
-!!!content-end!!!
-
-系统执行后自动返回结果，你继续第二轮输出：
-!!!file:{"action":"append","path":"D:\\\\notes\\\\长文.md"}!!!
-!!!content-start!!!
-第二段...（约1200字）
-!!!content-end!!!
-
-继续第三轮、第四轮...直到全部内容写完，最后用自然语言总结。
-
 格式（短内容 < 1000 字可直接用传统格式）：!!!file:{"action":"操作类型","path":"文件完整路径","content":"文件内容"}!!!
 
 支持的操作类型：
@@ -1085,49 +1107,18 @@ function getDefaultSystemPrompt() {
 - open：用系统默认程序打开文件
 - mkdir：创建文件夹
 
-### 文件操作示例
-
-1. 保存文本到 Markdown 文件：
-!!!file:{"action":"write","path":"D:\\\\notes\\\\学习笔记.md","content":"# 电路交换知识点\\n\\n电路交换是通信网中最早出现的一种交换方式..."}!!!
-
-2. 读取本地文档：
-!!!file:{"action":"read","path":"C:\\\\Users\\\\shenz\\\\Desktop\\\\课表.docx"}!!!
-
-3. 追加内容：
-!!!file:{"action":"append","path":"D:\\\\notes\\\\日志.txt","content":"\\n2026-09-09 新增记录"}!!!
-
-4. 列出目录：
-!!!file:{"action":"list","path":"D:\\\\notes"}!!!
-
-5. 复制文件：
-!!!file:{"action":"copy","source":"D:\\\\a.txt","dest":"D:\\\\backup\\\\a.txt"}!!!
-
-6. 重命名：
-!!!file:{"action":"rename","source":"D:\\\\old.txt","dest":"D:\\\\new.txt"}!!!
-
-7. 删除文件：
-!!!file:{"action":"delete","path":"D:\\\\temp\\\\old.log"}!!!
-
-8. 打开文件：
-!!!file:{"action":"open","path":"D:\\\\notes\\\\报告.docx"}!!!
-
-### 重要规则
-- 路径必须使用双反斜杠 \\\\ 或正斜杠 /
-- 传统格式中 content 的换行符用 \\n 表示；使用独立 content 通道时不需要任何转义
-- 超过 1000 字或代码文件必须使用独立 content 通道（!!!content-start!!! ... !!!content-end!!!），不要把长内容塞进 JSON
-- 超过 1500 字必须分块写入：第一块用 write，后续每块用 append，每块 1000-1500 字
-- .docx 和 .xlsx 文件会自动转换为纯文本处理
-- 写入文件时如果目录不存在会自动创建
-- 覆盖已有文件、删除文件等高危操作会弹出确认框，需用户确认后才执行
-- 只能操作用户预先授权的目录（白名单），系统目录禁止访问
-- 读取文件后，文件内容会自动返回给你，直接基于内容进行分析、整理、修改，然后写回原文件或另存新文件，不要让用户手动转述文件内容
-- 每次回复中可以包含多个 !!!file: 操作指令，系统会依次执行并把全部结果返回给你
+【路径规则】
+- 用 ~ 表示用户主目录
+- 用绝对路径操作文件
+- Windows 路径用反斜杠 \\\\，Linux/macOS 路径用斜杠 /
 
 ## 三、安全规则
 - 只执行用户明确请求的操作
 - 对于危险操作（删除文件、修改注册表等），先向用户说明风险
 - 不要执行任何可能损害系统的命令
-- 命令和文件操作会被系统弹窗拦截，用户确认后才会执行`;
+- 命令和文件操作会被系统弹窗拦截，用户确认后才会执行
+- 只能操作用户预先授权的目录（白名单），系统目录禁止访问
+- 每次回复中可以包含多个 !!!file: 操作指令，系统会依次执行并把全部结果返回给你`;
 }
 
 ipcMain.handle('config:save', (event, config) => {
@@ -1341,10 +1332,19 @@ async function getSelectedTextFromClipboard() {
     // 清空剪贴板，确保能检测到新复制的内容
     clipboard.clear();
 
-    // 模拟 Ctrl+C（用 PowerShell SendKeys）
+    // 模拟 Ctrl+C（跨平台）
     await new Promise((resolve) => {
-      const psCmd = `powershell.exe -NoProfile -NonInteractive -Command "Add-Type -AssemblyName System.Windows.Forms; [System.Windows.Forms.SendKeys]::SendWait('^c')"`;
-      exec(psCmd, { encoding: 'utf8', timeout: 5000, windowsHide: true }, () => resolve());
+      if (process.platform === 'win32') {
+        const psCmd = `powershell.exe -NoProfile -NonInteractive -Command "Add-Type -AssemblyName System.Windows.Forms; [System.Windows.Forms.SendKeys]::SendWait('^c')"`;
+        exec(psCmd, { encoding: 'utf8', timeout: 5000, windowsHide: true }, () => resolve());
+      } else if (process.platform === 'darwin') {
+        // macOS: 用 osascript 模拟 Cmd+C
+        exec(`osascript -e 'tell application "System Events" to keystroke "c" using command down'`,
+          { timeout: 5000 }, () => resolve());
+      } else {
+        // Linux: 用 xdotool（需要安装），失败则静默
+        exec(`xdotool key --clearmodifiers ctrl+c`, { timeout: 5000 }, () => resolve());
+      }
     });
 
     // 等待剪贴板更新
@@ -1436,13 +1436,18 @@ ipcMain.on('quickAction:close', () => {
 });
 
 // ============================================================
-//  IPC: Windows 系统命令执行
+//  IPC: 系统命令执行（跨平台）
 // ============================================================
 ipcMain.handle('win:exec', async (event, { command }) => {
   return new Promise((resolve) => {
-    const encoded = Buffer.from(command, 'utf16le').toString('base64');
-    const psCommand = `powershell.exe -NoProfile -NonInteractive -EncodedCommand ${encoded}`;
-    exec(psCommand, { encoding: 'utf8', timeout: 30000, windowsHide: true }, (error, stdout, stderr) => {
+    let cmdLine;
+    if (process.platform === 'win32') {
+      const encoded = Buffer.from(command, 'utf16le').toString('base64');
+      cmdLine = `powershell.exe -NoProfile -NonInteractive -EncodedCommand ${encoded}`;
+    } else {
+      cmdLine = command;
+    }
+    exec(cmdLine, { encoding: 'utf8', timeout: 30000, windowsHide: true }, (error, stdout, stderr) => {
       if (error) {
         resolve({ success: false, output: stderr || error.message });
       } else {
@@ -1450,6 +1455,13 @@ ipcMain.handle('win:exec', async (event, { command }) => {
       }
     });
   });
+});
+
+// 跨平台：在文件管理器中显示文件
+ipcMain.handle('shell:showInFolder', async (event, { filePath }) => {
+  const { shell } = require('electron');
+  shell.showItemInFolder(filePath);
+  return { success: true };
 });
 
 ipcMain.handle('win:confirm', async (event, { command }) => {

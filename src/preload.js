@@ -50,6 +50,7 @@ contextBridge.exposeInMainWorld('api', {
 
   // Windows 系统控制
   winExec: (command) => ipcRenderer.invoke('win:exec', { command }),
+  showInFolder: (filePath) => ipcRenderer.invoke('shell:showInFolder', { filePath }),
   winConfirm: (command) => ipcRenderer.invoke('win:confirm', { command }),
 
   // ============================================================

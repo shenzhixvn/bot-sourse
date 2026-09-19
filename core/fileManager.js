@@ -6,17 +6,39 @@
 
 const path = require('path');
 const fs = require('fs');
+const os = require('os');
 const PythonBridge = require('./python');
-const PowerShellBridge = require('./powershell');
+const ShellBridge = require('./powershell');
 
-// 系统关键目录（禁止访问）
-const SYSTEM_DIRS = [
+// 跨平台系统关键目录（禁止访问）
+const isWin = process.platform === 'win32';
+const isMac = process.platform === 'darwin';
+const SYSTEM_DIRS = isWin ? [
   'C:\\Windows',
   'C:\\Program Files',
   'C:\\Program Files (x86)',
   'C:\\ProgramData',
   'C:\\$Recycle.Bin',
   'C:\\System Volume Information',
+] : isMac ? [
+  '/System',
+  '/Library',
+  '/usr/lib',
+  '/bin',
+  '/sbin',
+  '/var/db',
+] : [
+  '/bin',
+  '/sbin',
+  '/usr/bin',
+  '/usr/sbin',
+  '/usr/lib',
+  '/lib',
+  '/boot',
+  '/etc',
+  '/var/lib',
+  '/proc',
+  '/sys',
 ];
 
 // 纯文本扩展名
@@ -40,7 +62,7 @@ class FileManager {
     this.autoOpen = options.autoOpen !== false;
     this.onLog = options.onLog || null;
     this.py = new PythonBridge();
-    this.ps = new PowerShellBridge();
+    this.shell = new ShellBridge();
     this.logs = [];
   }
 
@@ -420,10 +442,10 @@ class FileManager {
 
     const result = await this.py.openFile(filePath);
     if (result.status === 'error') {
-      // 回退到 PowerShell
+      // 回退到系统默认打开方式
       try {
-        await this.ps.exec(`Start-Process "${filePath}"`);
-        return { path: filePath, opened: true, method: 'powershell' };
+        await this.shell.open(filePath);
+        return { path: filePath, opened: true, method: 'system' };
       } catch (e) {
         throw new Error(result.message || e.message || '打开文件失败');
       }
