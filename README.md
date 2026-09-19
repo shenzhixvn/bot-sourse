@@ -186,3 +186,5 @@ BOT 内置一套**完全本地**的长期记忆系统，无需额外服务、不
 - 系统命令 / 文件操作受白名单与确认机制约束
 - 打包需要网络下载 Electron 二进制文件
 - 部分杀毒软件会拦截 `d3dcompiler_47.dll` 写入 `node_modules` 目录（该 DLL 常被恶意软件滥用，属安全软件特征拦截）。Electron 缺少此文件仍可正常运行，会自动回退到软件渲染或使用系统目录的 DLL；如需 GPU 硬件加速，可在杀毒软件中将项目目录添加为信任区后重新运行 `node node_modules/electron/install.js`
+#   b o t - s o u r s e  
+ 
