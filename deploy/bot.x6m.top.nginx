@@ -1,0 +1,20 @@
+server {
+    listen 80;
+    server_name bot.x6m.top;
+    root /var/www/update;
+    index index.html;
+
+    location / {
+        autoindex on;
+        autoindex_exact_size off;
+        autoindex_localtime on;
+        add_header Cache-Control "no-cache, no-store, must-revalidate";
+        add_header Access-Control-Allow-Origin "*";
+        add_header Access-Control-Allow-Methods "GET, OPTIONS";
+    }
+
+    location ~* \.(exe|yml|json|zip|dmg|deb|rpm)$ {
+        add_header Cache-Control "no-cache";
+        add_header Access-Control-Allow-Origin "*";
+    }
+}

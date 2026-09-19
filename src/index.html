@@ -1,0 +1,600 @@
+<!DOCTYPE html>
+<html lang="zh-CN" data-theme="dark">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>BOT</title>
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+  <!-- 标题栏 -->
+  <div class="titlebar" id="titlebar">
+    <div class="titlebar-left">
+      <div class="dot green"></div>
+      <span class="title">BOT</span>
+    </div>
+    <div class="titlebar-right">
+      <button class="title-btn theme-toggle" id="btn-theme" title="切换主题">🌙</button>
+      <button class="title-btn" id="btn-pin" title="窗口置顶">📌</button>
+      <button class="title-btn" id="btn-settings" title="设置">⚙</button>
+      <button class="title-btn" id="btn-minimize" title="最小化">─</button>
+      <button class="title-btn" id="btn-maximize" title="最大化">
+        <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <rect x="3" y="3" width="18" height="18" rx="2"></rect>
+        </svg>
+      </button>
+      <button class="title-btn close" id="btn-close" title="关闭">✕</button>
+    </div>
+  </div>
+
+  <!-- 主体区域：左侧边栏 + 右侧内容 -->
+  <div class="main-body">
+    <!-- 左侧边栏：会话列表 -->
+    <div class="sidebar" id="sidebar">
+      <!-- 新建对话按钮 -->
+      <div class="sidebar-header">
+        <button class="btn-new-conv" id="btn-new-conv">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <line x1="12" y1="5" x2="12" y2="19"></line>
+            <line x1="5" y1="12" x2="19" y2="12"></line>
+          </svg>
+          新建对话
+        </button>
+      </div>
+
+      <!-- 会话分组：置顶（主会话） -->
+      <div class="conv-section">
+        <div class="conv-section-title">置顶</div>
+        <div class="conv-list" id="conv-list-pinned">
+          <!-- 主会话由 JS 渲染 -->
+        </div>
+      </div>
+
+      <!-- 会话分组：最近（子会话） -->
+      <div class="conv-section">
+        <div class="conv-section-title">最近</div>
+        <div class="conv-list" id="conv-list-recent">
+          <!-- 子会话由 JS 渲染 -->
+        </div>
+      </div>
+    </div>
+
+    <!-- 右侧内容区 -->
+    <div class="content-area">
+      <!-- 设置面板 -->
+      <div class="settings-panel hidden" id="settings-panel">
+        <div class="settings-group">
+          <label>API Key</label>
+          <input type="password" id="cfg-apikey" placeholder="sk-..." spellcheck="false">
+        </div>
+        <div class="settings-group">
+          <label>API 地址</label>
+          <input type="text" id="cfg-baseurl" placeholder="https://api.xiaomimimo.com/v1" spellcheck="false">
+        </div>
+        <div class="settings-group">
+          <label>模型</label>
+          <input type="text" id="cfg-model" placeholder="mimo-v2.5-pro" spellcheck="false">
+        </div>
+        <div class="settings-group">
+          <label>系统提示词</label>
+          <textarea id="cfg-system" rows="3" spellcheck="false"></textarea>
+        </div>
+        <div class="settings-group settings-toggle-group">
+          <label class="toggle-label">
+            <input type="checkbox" id="cfg-show-system-results">
+            <span>显示系统执行结果（文件操作/命令执行的中间过程）</span>
+          </label>
+          <div class="toggle-hint">关闭后，系统自动执行结果将隐藏，只显示最终回复</div>
+        </div>
+        <div class="settings-group settings-toggle-group">
+          <label class="toggle-label">
+            <input type="checkbox" id="cfg-web-search">
+            <span>启用联网功能（每次对话自动联网搜索）</span>
+          </label>
+          <div class="toggle-hint">开启后，每次对话都会自动联网搜索实时信息（按量付费 ¥16/1000次）</div>
+        </div>
+        <div class="settings-group">
+          <label>联网搜索关键词数量</label>
+          <input type="number" id="cfg-web-search-maxkeyword" value="3" min="1" max="10" placeholder="3">
+          <div class="toggle-hint">一轮搜索最大关键词数量，数量越多费用越高（默认3）</div>
+        </div>
+        <div class="settings-group settings-toggle-group">
+          <label class="toggle-label">
+            <input type="checkbox" id="cfg-memory-enabled" checked>
+            <span>启用长期记忆（本地向量记忆库）</span>
+          </label>
+          <div class="toggle-hint">开启后，对话会自动沉淀到本机记忆库，提问时自动召回相关记忆。数据仅保存在本机，离线可用，不上传。</div>
+        </div>
+        <div class="settings-group">
+          <label>记忆召回条数</label>
+          <input type="number" id="cfg-memory-topk" value="5" min="1" max="20" placeholder="5">
+          <div class="toggle-hint">每次提问从记忆库召回的相关记忆条数（默认 5）</div>
+        </div>
+        <div class="settings-group">
+          <label>嵌入模型（可选）</label>
+          <input type="text" id="cfg-memory-embedding-model" placeholder="留空 = 本地嵌入；如 text-embedding-3-small" spellcheck="false">
+          <div class="toggle-hint">留空使用内置本地嵌入（无需联网、无额外费用）；填写则调用当前提供商的 /embeddings 接口，语义更准确。</div>
+          <div class="memory-stats" id="memory-stats">记忆库状态加载中…</div>
+          <div class="stt-config-row">
+            <button class="btn-diagnose" id="btn-memory-test">🔍 测试记忆检索</button>
+            <button class="btn-diagnose" id="btn-memory-clear">🗑 清空记忆库</button>
+          </div>
+        </div>
+        <div class="settings-group">
+          <label>全局快捷键（唤起/隐藏窗口）</label>
+          <div class="shortcut-input-row">
+            <input type="text" id="cfg-shortcut" value="Ctrl+Alt+M" placeholder="例如：Ctrl+Alt+M" spellcheck="false" readonly>
+            <button class="btn-shortcut-record" id="btn-record-shortcut">录制</button>
+          </div>
+          <div class="toggle-hint">按下快捷键可快速唤起或隐藏窗口。点击"录制"后按下想要的组合键。</div>
+          <div class="shortcut-status" id="shortcut-status"></div>
+        </div>
+        <div class="settings-group">
+          <label>选词助手快捷键</label>
+          <div class="shortcut-input-row">
+            <input type="text" id="cfg-quick-shortcut" value="Ctrl+Alt+Q" placeholder="例如：Ctrl+Alt+Q" spellcheck="false">
+          </div>
+          <div class="toggle-hint">选中任意文字后按下此快捷键，弹出选词助手进行翻译/总结/解释/润色。格式如 Ctrl+Alt+Q、Ctrl+Shift+T。</div>
+        </div>
+        <div class="settings-group">
+          <label>关闭窗口行为</label>
+          <div class="close-behavior-options">
+            <label class="close-behavior-option">
+              <input type="radio" name="close-behavior" value="tray" checked>
+              <span>最小化到托盘（推荐）</span>
+            </label>
+            <label class="close-behavior-option">
+              <input type="radio" name="close-behavior" value="quit">
+              <span>直接退出程序</span>
+            </label>
+          </div>
+          <div class="toggle-hint">选择点击窗口右上角 ✕ 时的行为。最小化到托盘后程序继续在后台运行，可通过托盘图标或快捷键唤起。</div>
+        </div>
+        <div class="settings-group">
+          <label>语音识别(STT)配置</label>
+          <div class="stt-config-hint">✅ 默认使用内置 V2.5-ASR 语音识别（复用上方 API Key，国内可用，支持中英文和方言）。下方为备选 HTTP STT 配置，如 OpenAI Whisper 等。</div>
+          <input type="text" id="cfg-stt-url" placeholder="【备选】STT API 地址（如 https://api.openai.com/v1/audio/transcriptions）" spellcheck="false">
+          <input type="password" id="cfg-stt-key" placeholder="【备选】STT API Key" spellcheck="false">
+          <div class="stt-config-row">
+            <input type="text" id="cfg-stt-model" placeholder="模型（默认 whisper-1）" spellcheck="false">
+            <input type="text" id="cfg-stt-lang" placeholder="语言（默认 zh）" spellcheck="false">
+          </div>
+          <button class="btn-diagnose" id="btn-diagnose-voice">🔍 诊断语音环境</button>
+        </div>
+        <div class="settings-group">
+          <label>唤醒词（语音唤醒）</label>
+          <div class="settings-toggle-group">
+            <label class="toggle-label">
+              <input type="checkbox" id="cfg-wake-enabled">
+              <span>启用唤醒词监听（后台持续监听，喊出唤醒词自动开启语音对话）</span>
+            </label>
+            <div class="toggle-hint">开启后程序会在后台持续监听麦克风，检测到唤醒词后自动进入语音对话模式。需配置 API Key。</div>
+          </div>
+          <div class="stt-config-row">
+            <input type="text" id="cfg-wake-word" value="bot" placeholder="唤醒词，如：bot / 小助手 / 你好" spellcheck="false">
+            <input type="text" id="cfg-wake-response" value="我在" placeholder="唤醒后的语音回复，如：我在 / 在呢 / 嗯" spellcheck="false">
+          </div>
+          <div class="stt-config-row">
+            <select id="cfg-wake-provider" style="flex:1">
+              <option value="bot">云端 API（稳定，标准普通话）</option>
+              <option value="web">Web Speech 实时（快速，方言/口音更好）</option>
+            </select>
+          </div>
+          <div class="stt-config-row">
+            <input type="text" id="cfg-wake-alternatives" value="" placeholder="替代词（可选，逗号分隔，如：伯特,波特）" spellcheck="false">
+          </div>
+          <div class="toggle-hint">唤醒词：喊出这个词即可唤醒。替代词：ASR 因口音可能识别出的其他写法，逗号分隔（可选）。推荐口音用户用 Web Speech 实时模式。</div>
+          <div class="wake-word-status" id="wake-word-settings-status"></div>
+          <div class="wake-word-debug" id="wake-word-debug">
+            <div class="wake-word-debug-label">实时识别（调试）：</div>
+            <div class="wake-word-debug-text" id="wake-word-debug-text">未启动监听</div>
+          </div>
+          <button class="btn-diagnose" id="btn-wake-test" style="margin-top:6px">🎤 测试录音3秒看识别结果</button>
+        </div>
+        <div class="settings-group">
+          <label>声纹识别（说话人验证）</label>
+          <div class="settings-toggle-group">
+            <label class="toggle-label">
+              <input type="checkbox" id="cfg-voiceprint-enabled">
+              <span>启用声纹验证（唤醒时需验证声纹，仅注册者可唤醒）</span>
+            </label>
+            <div class="toggle-hint">开启后，语音唤醒时会同时验证说话人声纹，未注册声纹者无法唤醒。需先录入声纹。</div>
+          </div>
+          <div class="voiceprint-config-row">
+            <label>验证阈值（相似度 %）</label>
+            <input type="number" id="cfg-voiceprint-threshold" value="82" min="60" max="99" step="1">
+            <span class="voiceprint-threshold-hint">越高越严格，默认 82%</span>
+          </div>
+          <div class="voiceprint-register-area">
+            <div class="voiceprint-register-status" id="voiceprint-register-status">未注册声纹</div>
+            <div class="voiceprint-register-progress">
+              <div class="voiceprint-progress-bar" id="voiceprint-progress-bar"></div>
+              <span class="voiceprint-progress-text" id="voiceprint-progress-text">0 / 3 段</span>
+            </div>
+            <div class="voiceprint-register-actions">
+              <button class="btn-diagnose" id="btn-voiceprint-record">🎙️ 录入第 1 段</button>
+              <button class="btn-diagnose" id="btn-voiceprint-register" disabled>✅ 完成注册</button>
+              <button class="btn-diagnose" id="btn-voiceprint-verify">🔍 测试验证</button>
+              <button class="btn-diagnose" id="btn-voiceprint-clear">🗑 清除声纹</button>
+            </div>
+            <div class="voiceprint-result" id="voiceprint-result"></div>
+          </div>
+        </div>
+        <div class="settings-group" id="provider-section">
+          <label>API 提供商管理</label>
+          <div class="provider-list" id="provider-list"></div>
+          <button class="btn-diagnose" id="btn-add-provider">➕ 添加提供商</button>
+          <!-- 提供商编辑表单 -->
+          <div class="provider-edit-form hidden" id="provider-edit-form">
+            <div class="provider-edit-title" id="provider-edit-title">添加提供商</div>
+            <input type="hidden" id="provider-edit-id">
+            <div class="settings-group">
+              <label>名称</label>
+              <input type="text" id="provider-edit-name" placeholder="如：DeepSeek" spellcheck="false">
+            </div>
+            <div class="settings-group">
+              <label>类型</label>
+              <select id="provider-edit-type">
+                <option value="openai-compatible">OpenAI 兼容（DeepSeek/通义/智谱/OpenAI 等）</option>
+                <option value="ollama">Ollama 本地模型</option>
+              </select>
+            </div>
+            <div class="settings-group">
+              <label>API 地址</label>
+              <input type="text" id="provider-edit-baseurl" placeholder="https://api.deepseek.com/v1" spellcheck="false">
+            </div>
+            <div class="settings-group">
+              <label>API Key</label>
+              <input type="password" id="provider-edit-apikey" placeholder="sk-..." spellcheck="false">
+            </div>
+            <div class="settings-group">
+              <label>模型</label>
+              <input type="text" id="provider-edit-model" placeholder="deepseek-chat" spellcheck="false">
+            </div>
+            <div class="settings-group">
+              <label>最大 Token</label>
+              <input type="number" id="provider-edit-maxtokens" value="2048" min="256" max="32768">
+            </div>
+            <div class="provider-edit-actions">
+              <button class="btn-save" id="provider-edit-save">保存</button>
+              <button class="btn-diagnose" id="provider-edit-test">🔍 测试连接</button>
+              <button class="btn-cancel" id="provider-edit-cancel">取消</button>
+            </div>
+            <div class="provider-test-result" id="provider-test-result"></div>
+          </div>
+        </div>
+        <div class="settings-group" id="agent-section">
+          <label>角色/智能体管理</label>
+          <div class="agent-list" id="agent-list"></div>
+          <button class="btn-diagnose" id="btn-add-agent">➕ 添加角色</button>
+          <!-- 角色编辑表单 -->
+          <div class="agent-edit-form hidden" id="agent-edit-form">
+            <div class="agent-edit-title" id="agent-edit-title">添加角色</div>
+            <input type="hidden" id="agent-edit-id">
+            <div class="settings-group">
+              <label>名称</label>
+              <input type="text" id="agent-edit-name" placeholder="如：代码专家" spellcheck="false">
+            </div>
+            <div class="settings-group">
+              <label>头像（emoji）</label>
+              <input type="text" id="agent-edit-avatar" placeholder="🤖" maxlength="4" style="width:80px">
+            </div>
+            <div class="settings-group">
+              <label>系统提示词（留空使用全局默认）</label>
+              <textarea id="agent-edit-prompt" rows="4" placeholder="你是一个...角色设定..." spellcheck="false"></textarea>
+            </div>
+            <div class="settings-group">
+              <label>模型（留空使用当前提供商默认模型）</label>
+              <input type="text" id="agent-edit-model" placeholder="如：mimo-v2.5-pro" spellcheck="false">
+            </div>
+            <div class="settings-group">
+              <label>温度（0-1，越低越严谨）</label>
+              <input type="number" id="agent-edit-temperature" value="0.7" min="0" max="2" step="0.1" style="width:80px">
+            </div>
+            <div class="settings-group settings-toggle-group">
+              <label class="toggle-label">
+                <input type="checkbox" id="agent-edit-tool-file" checked>
+                <span>允许文件操作</span>
+              </label>
+            </div>
+            <div class="settings-group settings-toggle-group">
+              <label class="toggle-label">
+                <input type="checkbox" id="agent-edit-tool-command" checked>
+                <span>允许执行系统命令</span>
+              </label>
+            </div>
+            <div class="settings-group settings-toggle-group">
+              <label class="toggle-label">
+                <input type="checkbox" id="agent-edit-tool-screenshot" checked>
+                <span>允许截图识别</span>
+              </label>
+            </div>
+            <div class="provider-edit-actions">
+              <button class="btn-save" id="agent-edit-save">保存</button>
+              <button class="btn-cancel" id="agent-edit-cancel">取消</button>
+            </div>
+          </div>
+        </div>
+        <div class="settings-actions">
+          <button class="btn-save" id="btn-save-cfg">保存</button>
+          <button class="btn-cancel" id="btn-cancel-cfg">取消</button>
+        </div>
+        <div class="settings-about">
+          <div class="settings-about-name">BOT</div>
+          <div class="settings-about-version">版本 1.3.0</div>
+          <div class="settings-about-author">沈若萱 开发</div>
+          <button class="btn-check-update" id="btn-check-update">🔍 检查更新</button>
+          <div class="update-check-result" id="update-check-result"></div>
+        </div>
+      </div>
+
+      <!-- 聊天区域 -->
+      <div class="chat-area" id="chat-area">
+        <!-- 更新横幅 -->
+        <div class="update-banner hidden" id="update-banner">
+          <div class="update-banner-content">
+            <span class="update-banner-icon" id="update-banner-icon">🚀</span>
+            <span class="update-banner-text" id="update-banner-text">发现新版本</span>
+            <div class="update-banner-progress hidden" id="update-banner-progress">
+              <div class="update-banner-progress-bar" id="update-banner-progress-bar"></div>
+            </div>
+          </div>
+          <div class="update-banner-actions">
+            <button class="update-banner-btn" id="update-btn-action">立即更新</button>
+            <button class="update-banner-btn update-banner-btn-close" id="update-btn-close">×</button>
+          </div>
+        </div>
+        <!-- 拖拽提示遮罩 -->
+        <div class="drag-overlay hidden" id="drag-overlay">
+          <div class="drag-overlay-content">
+            <div class="drag-overlay-icon">📁</div>
+            <div class="drag-overlay-text">松开鼠标读取文件</div>
+            <div class="drag-overlay-hint">支持 .txt .md .docx .xlsx .csv .json 等格式</div>
+          </div>
+        </div>
+        <!-- 聊天顶部工具栏 -->
+        <div class="chat-header" id="chat-header">
+          <div class="chat-header-left">
+            <div class="agent-selector" id="agent-selector">
+              <span class="agent-avatar" id="agent-avatar">🤖</span>
+              <span class="agent-name" id="agent-name">默认助手</span>
+              <span class="agent-arrow">▾</span>
+            </div>
+            <div class="agent-dropdown hidden" id="agent-dropdown"></div>
+            <div class="chat-header-title" id="chat-header-title">主对话</div>
+          </div>
+          <div class="chat-header-actions">
+            <button class="chat-header-btn" id="btn-search" title="搜索消息 (Ctrl+F)">🔍 搜索</button>
+            <button class="chat-header-btn" id="btn-export" title="导出对话为 Markdown">📥 导出</button>
+          </div>
+        </div>
+        <!-- 搜索条 -->
+        <div class="search-bar hidden" id="search-bar">
+          <div class="search-input-wrap">
+            <input type="text" id="search-input" placeholder="搜索消息内容..." spellcheck="false">
+          </div>
+          <div class="search-count" id="search-count">0 / 0</div>
+          <div class="search-nav">
+            <button class="search-nav-btn" id="search-prev" title="上一个 (Shift+Enter)">↑</button>
+            <button class="search-nav-btn" id="search-next" title="下一个 (Enter)">↓</button>
+          </div>
+          <button class="search-close" id="search-close" title="关闭 (Esc)">✕</button>
+        </div>
+        <div class="welcome" id="welcome">
+          <div class="welcome-icon">✦</div>
+          <div class="welcome-text">你好，我是 BOT</div>
+          <div class="welcome-sub">随时为你服务</div>
+        </div>
+      </div>
+
+      <!-- 输出面板（命令/文件/日志） -->
+      <div class="output-panel hidden" id="output-panel">
+        <div class="output-panel-header">
+          <div class="output-tabs">
+            <button class="output-tab active" data-tab="terminal">⚡ 终端</button>
+            <button class="output-tab" data-tab="file">📁 文件</button>
+            <button class="output-tab" data-tab="log">📋 日志</button>
+          </div>
+          <div class="output-panel-actions">
+            <button class="output-clear" id="output-clear" title="清空当前标签">清空</button>
+            <button class="output-close" id="output-close" title="收起面板">✕</button>
+          </div>
+        </div>
+        <div class="output-panel-body">
+          <div class="output-content active" id="output-terminal"></div>
+          <div class="output-content" id="output-file"></div>
+          <div class="output-content" id="output-log"></div>
+        </div>
+      </div>
+
+      <!-- 输出面板提示条（收起状态，悬停展开） -->
+      <div class="output-strip hidden" id="output-strip">
+        <span class="output-strip-dot"></span>
+        <span class="output-strip-text">输出面板 · 悬停展开</span>
+      </div>
+
+      <!-- 语音状态栏 -->
+      <div class="voice-status hidden" id="voice-status">
+        <div class="wave"><span></span><span></span><span></span><span></span><span></span></div>
+        <span id="voice-status-text">正在聆听...</span>
+      </div>
+
+      <!-- 语音识别确认面板 -->
+      <div class="voice-confirm-panel hidden" id="voice-confirm-panel">
+        <div class="voice-confirm-header">
+          <span class="voice-confirm-icon">🎤</span>
+          <span class="voice-confirm-title">语音识别结果</span>
+          <button class="voice-confirm-close" id="voice-confirm-close" title="关闭">✕</button>
+        </div>
+        <div class="voice-confirm-body">
+          <textarea id="voice-confirm-text" rows="3" placeholder="识别结果将显示在这里，可手动修正..."></textarea>
+          <div class="voice-confirm-hint" id="voice-confirm-hint">确认文本无误后点击发送，或直接编辑修正</div>
+        </div>
+        <div class="voice-confirm-actions">
+          <button class="voice-btn voice-btn-retry" id="voice-btn-retry">🔄 重新录入</button>
+          <button class="voice-btn voice-btn-cancel" id="voice-btn-cancel">取消</button>
+          <button class="voice-btn voice-btn-send" id="voice-btn-send">✓ 确认发送</button>
+        </div>
+      </div>
+
+      <!-- 语音错误提示 -->
+      <div class="voice-error-toast hidden" id="voice-error-toast">
+        <div class="voice-error-icon">⚠️</div>
+        <div class="voice-error-content">
+          <div class="voice-error-text" id="voice-error-text"></div>
+          <div class="voice-error-suggestion hidden" id="voice-error-suggestion">连续识别失败，建议切换键盘文字输入</div>
+        </div>
+        <button class="voice-error-close" id="voice-error-close">✕</button>
+      </div>
+
+      <!-- 输入区域 -->
+      <div class="input-area">
+        <!-- 附件预览区 -->
+        <div class="attachment-preview hidden" id="attachment-preview"></div>
+        <div class="input-wrapper">
+          <button class="upload-btn" id="btn-upload-file" title="上传文件">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none">
+              <path d="M21.44 11.05l-9.19 9.19a6 6 0 01-8.49-8.49l9.19-9.19a4 4 0 015.66 5.66l-9.2 9.19a2 2 0 01-2.83-2.83l8.49-8.48" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+            </svg>
+          </button>
+          <button class="upload-btn" id="btn-upload-image" title="上传图片">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none">
+              <rect x="3" y="3" width="18" height="18" rx="2" ry="2" stroke="currentColor" stroke-width="2"/>
+              <circle cx="8.5" cy="8.5" r="1.5" fill="currentColor"/>
+              <path d="M21 15l-5-5L5 21" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+            </svg>
+          </button>
+          <button class="upload-btn" id="btn-screenshot" title="截图识别">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none">
+              <path d="M23 19a2 2 0 01-2 2H3a2 2 0 01-2-2V8a2 2 0 012-2h4l2-3h6l2 3h4a2 2 0 012 2z" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+              <circle cx="12" cy="13" r="4" stroke="currentColor" stroke-width="2"/>
+            </svg>
+          </button>
+          <textarea id="input" placeholder="输入消息..." rows="1" autofocus></textarea>
+          <button class="mic-btn" id="btn-mic" title="语音输入">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none">
+              <rect x="9" y="2" width="6" height="12" rx="3" stroke="currentColor" stroke-width="2"/>
+              <path d="M5 10a7 7 0 0014 0" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
+              <line x1="12" y1="17" x2="12" y2="22" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
+              <line x1="8" y1="22" x2="16" y2="22" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
+            </svg>
+          </button>
+          <button class="phone-btn" id="btn-phone" title="语音电话">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none">
+              <path d="M22 16.92v3a2 2 0 01-2.18 2 19.79 19.79 0 01-8.63-3.07 19.5 19.5 0 01-6-6 19.79 19.79 0 01-3.07-8.67A2 2 0 014.11 2h3a2 2 0 012 1.72c.127.96.361 1.903.7 2.81a2 2 0 01-.45 2.11L8.09 9.91a16 16 0 006 6l1.27-1.27a2 2 0 012.11-.45c.907.339 1.85.573 2.81.7A2 2 0 0122 16.92z" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+            </svg>
+          </button>
+          <button class="wake-btn" id="btn-wake" title="唤醒词监听">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none">
+              <path d="M12 1a3 3 0 0 0-3 3v8a3 3 0 0 0 6 0V4a3 3 0 0 0-3-3z" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+              <path d="M19 10v2a7 7 0 0 1-14 0v-2" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+              <line x1="12" y1="19" x2="12" y2="23" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
+              <line x1="8" y1="23" x2="16" y2="23" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
+            </svg>
+          </button>
+          <button class="send-btn" id="btn-send" title="发送">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none">
+              <path d="M22 2L11 13" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
+              <path d="M22 2L15 22L11 13L2 9L22 2Z" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+            </svg>
+          </button>
+        </div>
+        <div class="input-hint">
+          <span>Enter 发送 · Shift+Enter 换行 · 📎 上传文件 · 🖼️ 上传图片 · 📷 截图<span class="hint-phone"> · 📞 语音电话 · 🎙️ 唤醒词</span></span>
+          <span class="input-token-count" id="input-token-count">0 tokens</span>
+        </div>
+      </div>
+      <!-- 隐藏的文件选择器 -->
+      <input type="file" id="file-input" multiple style="display:none">
+      <input type="file" id="image-input" accept="image/*" multiple style="display:none">
+    </div>
+  </div>
+
+  <!-- 语音电话覆盖层 -->
+  <div class="phone-overlay hidden" id="phone-overlay">
+    <div class="phone-container">
+      <!-- 顶部：助手信息 -->
+      <div class="phone-header">
+        <div class="phone-avatar">
+          <svg width="32" height="32" viewBox="0 0 24 24" fill="none">
+            <path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2z" stroke="currentColor" stroke-width="2"/>
+            <circle cx="12" cy="8" r="3" stroke="currentColor" stroke-width="2"/>
+            <path d="M6 20c0-3.31 2.69-6 6-6s6 2.69 6 6" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
+          </svg>
+        </div>
+        <div class="phone-info">
+          <div class="phone-name">BOT</div>
+          <div class="phone-status" id="phone-status">正在连接...</div>
+        </div>
+      </div>
+
+      <!-- 中间：对话内容 -->
+      <div class="phone-messages" id="phone-messages">
+        <div class="phone-system-msg">通话已连接，点击下方麦克风开始说话</div>
+      </div>
+
+      <!-- 底部：操作按钮 -->
+      <div class="phone-controls">
+        <button class="phone-mic-btn" id="phone-mic-btn" title="正在聆听... 点击可提前结束">
+          <svg width="28" height="28" viewBox="0 0 24 24" fill="none">
+            <rect x="9" y="2" width="6" height="12" rx="3" stroke="currentColor" stroke-width="2"/>
+            <path d="M5 10a7 7 0 0014 0" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
+            <line x1="12" y1="17" x2="12" y2="22" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
+            <line x1="8" y1="22" x2="16" y2="22" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
+          </svg>
+        </button>
+        <button class="phone-hangup-btn" id="phone-hangup-btn" title="挂断">
+          <svg width="28" height="28" viewBox="0 0 24 24" fill="none" style="transform: rotate(135deg);">
+            <path d="M22 16.92v3a2 2 0 01-2.18 2 19.79 19.79 0 01-8.63-3.07 19.5 19.5 0 01-6-6 19.79 19.79 0 01-3.07-8.67A2 2 0 014.11 2h3a2 2 0 012 1.72c.127.96.361 1.903.7 2.81a2 2 0 01-.45 2.11L8.09 9.91a16 16 0 006 6l1.27-1.27a2 2 0 012.11-.45c.907.339 1.85.573 2.81.7A2 2 0 0122 16.92z" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+          </svg>
+        </button>
+      </div>
+      <div class="phone-hint" id="phone-hint">自动检测说话结束 · 停止说话2秒后自动识别 · 挂断结束通话</div>
+    </div>
+  </div>
+
+  <!-- 导出对话对话框 -->
+  <div class="modal-overlay hidden" id="export-modal">
+    <div class="modal-box">
+      <div class="modal-title">导出对话为 Markdown</div>
+      <div class="modal-body">
+        <div class="export-option">
+          <label>导出范围</label>
+          <div class="export-range-options">
+            <label class="radio-label">
+              <input type="radio" name="export-range" value="all" checked>
+              <span>全部消息</span>
+            </label>
+            <label class="radio-label">
+              <input type="radio" name="export-range" value="recent">
+              <span>最近 N 条</span>
+            </label>
+          </div>
+        </div>
+        <div class="export-option hidden" id="export-count-option">
+          <label>导出消息数量</label>
+          <input type="number" id="export-count" value="20" min="1" placeholder="20">
+          <div class="toggle-hint">导出最近的 N 条消息（包含用户和助手消息）</div>
+        </div>
+        <div class="export-option">
+          <label>包含系统执行结果</label>
+          <label class="toggle-label">
+            <input type="checkbox" id="export-include-system" checked>
+            <span>包含文件操作/命令执行的中间结果</span>
+          </label>
+        </div>
+      </div>
+      <div class="modal-actions">
+        <button class="btn-cancel" id="btn-export-cancel">取消</button>
+        <button class="btn-save" id="btn-export-confirm">导出</button>
+      </div>
+    </div>
+  </div>
+
+  <script src="voiceModule.js"></script>
+  <script src="ttsModule.js"></script>
+  <script src="wakeWord.js"></script>
+  <script src="voiceprint.js"></script>
+  <script src="renderer.js"></script>
+</body>
+</html>

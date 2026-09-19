@@ -1,0 +1,203 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="UTF-8">
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  html, body {
+    width: 100%; height: 100%;
+    overflow: hidden;
+    cursor: crosshair;
+    user-select: none;
+  }
+  #screen-bg {
+    position: fixed;
+    top: 0; left: 0;
+    width: 100%; height: 100%;
+    object-fit: cover;
+  }
+  #overlay {
+    position: fixed;
+    top: 0; left: 0;
+    width: 100%; height: 100%;
+    background: rgba(0, 0, 0, 0.4);
+  }
+  #selection {
+    position: fixed;
+    border: 2px solid #4f8cff;
+    background: rgba(79, 140, 255, 0.1);
+    display: none;
+    pointer-events: none;
+  }
+  #selection::before {
+    content: '';
+    position: absolute;
+    top: -2px; left: -2px; right: -2px; bottom: -2px;
+    box-shadow: 0 0 0 9999px rgba(0, 0, 0, 0.4);
+    z-index: -1;
+  }
+  #toolbar {
+    position: fixed;
+    bottom: 20px;
+    left: 50%;
+    transform: translateX(-50%);
+    display: flex;
+    gap: 10px;
+    background: rgba(30, 30, 30, 0.9);
+    padding: 10px 16px;
+    border-radius: 10px;
+    backdrop-filter: blur(10px);
+    z-index: 100;
+  }
+  #toolbar button {
+    padding: 8px 20px;
+    border: none;
+    border-radius: 6px;
+    font-size: 14px;
+    cursor: pointer;
+    transition: all 0.15s;
+  }
+  #btn-confirm {
+    background: #4f8cff;
+    color: #fff;
+  }
+  #btn-confirm:hover { background: #3a7bef; }
+  #btn-confirm:disabled {
+    background: #555;
+    cursor: not-allowed;
+  }
+  #btn-cancel {
+    background: rgba(255,255,255,0.1);
+    color: #fff;
+  }
+  #btn-cancel:hover { background: rgba(255,255,255,0.2); }
+  #size-label {
+    position: fixed;
+    color: #fff;
+    font-size: 12px;
+    background: rgba(0,0,0,0.7);
+    padding: 3px 8px;
+    border-radius: 4px;
+    pointer-events: none;
+    display: none;
+    z-index: 50;
+  }
+  #hint {
+    position: fixed;
+    top: 20px;
+    left: 50%;
+    transform: translateX(-50%);
+    color: #fff;
+    font-size: 14px;
+    background: rgba(0,0,0,0.6);
+    padding: 8px 20px;
+    border-radius: 20px;
+    z-index: 50;
+  }
+</style>
+</head>
+<body>
+  <img id="screen-bg">
+  <div id="overlay"></div>
+  <div id="selection"></div>
+  <div id="size-label"></div>
+  <div id="hint">拖拽鼠标选择截图区域，按 Esc 取消</div>
+  <div id="toolbar">
+    <button id="btn-cancel">取消 (Esc)</button>
+    <button id="btn-confirm" disabled>确认截图 (Enter)</button>
+  </div>
+
+<script>
+  const { ipcRenderer } = require('electron');
+
+  const screenBg = document.getElementById('screen-bg');
+  const selection = document.getElementById('selection');
+  const sizeLabel = document.getElementById('size-label');
+  const btnConfirm = document.getElementById('btn-confirm');
+  const btnCancel = document.getElementById('btn-cancel');
+
+  let startX = 0, startY = 0;
+  let endX = 0, endY = 0;
+  let isSelecting = false;
+  let hasSelection = false;
+
+  // 接收屏幕截图
+  ipcRenderer.on('screenshot:image', (event, dataUrl) => {
+    screenBg.src = dataUrl;
+  });
+
+  // 鼠标按下开始选择
+  document.addEventListener('mousedown', (e) => {
+    if (e.target.tagName === 'BUTTON') return;
+    startX = e.clientX;
+    startY = e.clientY;
+    isSelecting = true;
+    hasSelection = false;
+    selection.style.display = 'block';
+    selection.style.left = startX + 'px';
+    selection.style.top = startY + 'px';
+    selection.style.width = '0px';
+    selection.style.height = '0px';
+    btnConfirm.disabled = true;
+  });
+
+  // 鼠标移动更新选择区域
+  document.addEventListener('mousemove', (e) => {
+    if (!isSelecting) return;
+    endX = e.clientX;
+    endY = e.clientY;
+    const x = Math.min(startX, endX);
+    const y = Math.min(startY, endY);
+    const w = Math.abs(endX - startX);
+    const h = Math.abs(endY - startY);
+    selection.style.left = x + 'px';
+    selection.style.top = y + 'px';
+    selection.style.width = w + 'px';
+    selection.style.height = h + 'px';
+    // 显示尺寸
+    sizeLabel.style.display = 'block';
+    sizeLabel.style.left = (x + w / 2 - 30) + 'px';
+    sizeLabel.style.top = (y - 24) + 'px';
+    sizeLabel.textContent = Math.round(w) + ' × ' + Math.round(h);
+  });
+
+  // 鼠标松开结束选择
+  document.addEventListener('mouseup', (e) => {
+    if (!isSelecting) return;
+    isSelecting = false;
+    const w = Math.abs(endX - startX);
+    const h = Math.abs(endY - startY);
+    if (w > 5 && h > 5) {
+      hasSelection = true;
+      btnConfirm.disabled = false;
+    } else {
+      selection.style.display = 'none';
+      sizeLabel.style.display = 'none';
+    }
+  });
+
+  // 确认截图
+  function confirmScreenshot() {
+    if (!hasSelection) return;
+    const x = Math.min(startX, endX);
+    const y = Math.min(startY, endY);
+    const w = Math.abs(endX - startX);
+    const h = Math.abs(endY - startY);
+    ipcRenderer.send('screenshot:confirm', { x, y, w: Math.round(w), h: Math.round(h) });
+  }
+
+  // 取消截图
+  function cancelScreenshot() {
+    ipcRenderer.send('screenshot:cancel');
+  }
+
+  btnConfirm.addEventListener('click', confirmScreenshot);
+  btnCancel.addEventListener('click', cancelScreenshot);
+
+  document.addEventListener('keydown', (e) => {
+    if (e.key === 'Escape') cancelScreenshot();
+    if (e.key === 'Enter' && hasSelection) confirmScreenshot();
+  });
+</script>
+</body>
+</html>

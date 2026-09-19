@@ -1,0 +1,48 @@
+<!DOCTYPE html>
+<html lang="zh-CN" data-theme="dark">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>BOT - 会话管理</title>
+  <link rel="stylesheet" href="style.css">
+</head>
+<body class="manager-body">
+  <!-- 标题栏 -->
+  <div class="titlebar" id="titlebar">
+    <div class="titlebar-left">
+      <div class="dot green"></div>
+      <span class="title">会话管理</span>
+    </div>
+    <div class="titlebar-right">
+      <button class="title-btn theme-toggle" id="btn-theme" title="切换主题">🌙</button>
+      <button class="title-btn" id="btn-minimize">─</button>
+      <button class="title-btn close" id="btn-close">✕</button>
+    </div>
+  </div>
+
+  <!-- 新建对话按钮 -->
+  <div class="manager-header">
+    <button class="btn-new-chat" id="btn-new-chat">
+      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+        <line x1="12" y1="5" x2="12" y2="19"></line>
+        <line x1="5" y1="12" x2="19" y2="12"></line>
+      </svg>
+      新建对话
+    </button>
+  </div>
+
+  <!-- 会话列表 -->
+  <div class="conversation-list" id="conversation-list">
+    <!-- 会话项由 JS 动态生成 -->
+  </div>
+
+  <!-- 空状态 -->
+  <div class="manager-empty hidden" id="manager-empty">
+    <div class="empty-icon">💬</div>
+    <div class="empty-text">还没有对话</div>
+    <div class="empty-sub">点击上方按钮开始新对话</div>
+  </div>
+
+  <script src="manager.js"></script>
+</body>
+</html>
